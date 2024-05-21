@@ -1,0 +1,47 @@
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
+from datasets import load_dataset
+
+# Define model and tokenizer names (replace with your choices)
+model_name = "bert-base-uncased"
+tokenizer_name = model_name
+
+# Load tokenizer and model
+tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)  # 2 for positive/negative sentiment
+
+# Load your custom dataset (replace with your data loading logic)
+train_data = load_dataset("text", data_files={"train": "your_training_data.txt"})
+
+# Preprocess data (clean and tokenize)
+def preprocess_function(examples):
+  return tokenizer(examples["text"], padding="max_length", truncation=True)
+
+train_data = train_data.map(preprocess_function, batched=True)
+
+# Define training arguments 
+training_args = TrainingArguments(
+    output_dir="./results",
+    per_device_train_batch_size=8,
+    num_train_epochs=3,
+    learning_rate=2e-5
+)
+
+# Define Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_data["train"],
+    compute_metrics=lambda pred: accuracy_metric(pred.predictions, pred.label_ids)
+)
+
+# Define evaluation metric (replace with your custom metric if needed)
+def accuracy_metric(pred):
+  labels = pred.label_ids
+  preds = pred.predictions.argmax(-1)
+  return {"accuracy": (labels == preds).mean()}
+
+# Start Training
+trainer.train()
+
+# Save the fine-tuned model
+model.save_pretrained("sentiment_analysis_model")
